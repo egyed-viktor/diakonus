@@ -6,11 +6,11 @@
   <title>Meghívó</title>
   <style>
     :root {
-      --page-w: 85vw;   /* Egy lap szélessége mobilon */
-      --page-h: 120vw;  /* Magasság */
-      --max-w: 350px;   /* Max szélesség desktopon */
-      --max-h: 495px;
-      --dur: 1.2s;
+      --page-w: 80vw;
+      --page-h: 115vw;
+      --max-w: 340px;
+      --max-h: 480px;
+      --dur: 1.1s;
       --ease: cubic-bezier(.645, .045, .355, 1);
       --radius: 12px;
     }
@@ -25,9 +25,8 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding-top: 30px;
+      padding-top: 40px;
       background: #f0ece9;
-      font-family: 'Georgia', serif;
       overflow: hidden;
       touch-action: none;
     }
@@ -36,36 +35,38 @@
       width: var(--page-w);
       height: var(--page-h);
       perspective: 2500px;
-      position: relative;
     }
 
     .book-wrap {
       position: absolute;
       width: 100%;
       height: 100%;
-      left: 0;
       transform-style: preserve-3d;
       transition: transform var(--dur) var(--ease);
       transform-origin: left center;
     }
 
-    /* --- MOZGÁS LOGIKA --- */
-    
-    /* 0: Borító középen */
+    /* --- DINAMIKUS MOZGÁS --- */
+
+    /* State 0: Borító (1.png) középen */
     .state-0 .book-wrap { transform: translateX(0); }
 
-    /* 1-2: Kinyílik, a forgástengely eltolódik, hogy a 2-3 oldal egymás mellett legyen középen */
-    .state-1 .book-wrap, 
-    .state-2 .book-wrap { transform: translateX(50%); }
+    /* State 1: Kinyílik, a 2.png kerül középre (könyv eltolva jobbra) */
+    .state-1 .book-wrap { transform: translateX(100%); }
 
-    /* 3: Becsukódik, a hátlap (4.png) visszakerül középre */
+    /* State 2: Csúsztatás: a 3.png kerül középre (könyv visszahúzva balra) */
+    .state-2 .book-wrap { transform: translateX(0); }
+
+    /* State 3: Becsukódik: a 4.png (hátlap) kerül középre */
     .state-3 .book-wrap { transform: translateX(100%); }
+
+    /* Átmeneti állapot a becsukáshoz: középvonal középre kerül */
+    .closing .book-wrap { transform: translateX(50%) !important; }
 
     .leaf {
       position: absolute;
       width: 100%;
       height: 100%;
-      left: 0;
       transform-style: preserve-3d;
       transition: transform var(--dur) var(--ease), z-index 0.3s;
       border-radius: var(--radius);
@@ -75,18 +76,8 @@
     #leaf-cover { z-index: 10; }
     #leaf-back { z-index: 5; }
 
-    /* LAPOZÁS */
-    /* Első lap átfordul balra */
-    #leaf-cover.flipped { 
-      transform: rotateY(-180deg); 
-      z-index: 4; 
-    }
-
-    /* Második lap rácsukódik az elsőre balra */
-    #leaf-back.flipped { 
-      transform: rotateY(-180deg); 
-      z-index: 11; /* Legfelülre kerül a hátlap */
-    }
+    #leaf-cover.flipped { transform: rotateY(-180deg); z-index: 4; }
+    #leaf-back.flipped { transform: rotateY(-180deg); z-index: 11; }
 
     .face {
       position: absolute;
@@ -99,7 +90,7 @@
     }
 
     .back { transform: rotateY(180deg); }
-    img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius); pointer-events: none; }
+    img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius); }
 
     .nav-dots {
       position: fixed;
@@ -109,21 +100,18 @@
       left: 50%;
       transform: translateX(-50%);
     }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1cbc8; transition: 0.3s; }
-    .dot.active { background: #a57662; transform: scale(1.2); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+    .dot.active { background: #a57662; }
   </style>
 </head>
 <body class="state-0" onclick="handleClick(event)">
 
   <div class="viewport">
     <div class="book-wrap">
-      <!-- MÁSODIK LAP (3. kép elöl, 4. kép hátul) -->
       <div class="leaf" id="leaf-back">
         <div class="face front"><img src="3.png"></div>
         <div class="face back"><img src="4.png"></div>
       </div>
-      
-      <!-- ELSŐ LAP (1. kép elöl, 2. kép hátul) -->
       <div class="leaf" id="leaf-cover">
         <div class="face front"><img src="1.png"></div>
         <div class="face back"><img src="2.png"></div>
@@ -148,12 +136,24 @@
     function move(dir) {
       const newState = state + dir;
       if (newState < 0 || newState > 3) return;
-      state = newState;
 
+      // Speciális kezelés a 3 -> 4 lapozáshoz (State 2 -> 3)
+      if (state === 2 && newState === 3) {
+        body.classList.add('closing'); // Középvonal középre húzása
+        setTimeout(() => {
+          body.classList.remove('closing');
+          applyState(newState);
+        }, 300); // Rövid ideig tart a középvonalas fázis a lapozás elején
+      } else {
+        applyState(newState);
+      }
+    }
+
+    function applyState(newState) {
+      state = newState;
+      body.className = 'state-' + state;
       cover.classList.toggle('flipped', state >= 1);
       backLeaf.classList.toggle('flipped', state >= 3);
-      
-      body.className = 'state-' + state;
       dots.forEach((dot, idx) => dot.classList.toggle('active', idx === state));
     }
 
@@ -162,17 +162,13 @@
       else move(-1);
     }
 
+    // Swipe kezelés
     let touchStartX = 0;
     document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
     document.addEventListener('touchend', e => {
       const touchEndX = e.changedTouches[0].screenX;
       if (touchStartX - touchEndX > 50) move(1);
       if (touchStartX - touchEndX < -50) move(-1);
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === "ArrowRight") move(1);
-      if (e.key === "ArrowLeft") move(-1);
     });
   </script>
 </body>
