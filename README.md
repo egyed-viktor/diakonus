@@ -1,0 +1,2 @@
+# diakonus
+Diakónusszentelési meghívó
