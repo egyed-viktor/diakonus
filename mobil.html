@@ -60,6 +60,7 @@
       transition: transform var(--dur) var(--ease), z-index 0.3s;
       border-radius: var(--radius);
       transform-origin: left center;
+      backface-visibility: hidden;
     }
 
     #leaf-cover { z-index: 10; }
@@ -78,13 +79,15 @@
       border-radius: var(--radius);
       background: white;
       box-shadow: 0 5px 25px rgba(0,0,0,0.15);
-      transform: translateZ(0);
+      transform: translateZ(1px);
     }
 
-    .back { transform: rotateY(180deg); }
+    .back { transform: rotateY(180deg) translateZ(1px); }
     img { width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius); pointer-events: none; }
 
-    .hide-cover #leaf-cover { visibility: hidden; }
+    /* Csak akkor rejtünk, ha már nem mozgunk */
+    body.state-0:not(.moving-to-back) #leaf-back, 
+    body.state-3:not(.moving-to-back) #leaf-cover { visibility: hidden !important; }
 
     .nav-dots {
       position: fixed; bottom: 40px; display: flex; gap: 10px; left: 50%; transform: translateX(-50%);
@@ -122,26 +125,20 @@
       if (newState < 0 || newState > 3) return;
 
       if (state === 2 && newState === 3) {
-        body.classList.remove('hide-cover');
         body.classList.add('moving-to-back');
         backLeaf.classList.add('flipped');
         setTimeout(() => {
-          body.classList.remove('moving-to-back');
           applyState(newState);
-        }, 400);
-        setTimeout(() => { if(state === 3) body.classList.add('hide-cover'); }, 1100);
+          setTimeout(() => body.classList.remove('moving-to-back'), 50);
+        }, 800); // Késleltetett eltűnés (800ms-nél már takarásban van)
 
       } else if (state === 1 && newState === 0) {
-        // Speciális visszalapozás 2-ről 1-re (State 1 -> 0)
         body.classList.add('moving-to-back');
         cover.classList.remove('flipped');
         setTimeout(() => {
-          body.classList.remove('moving-to-back');
           applyState(newState);
-        }, 400);
-      } else if (state === 3 && newState === 2) {
-        body.classList.remove('hide-cover');
-        applyState(newState);
+          setTimeout(() => body.classList.remove('moving-to-back'), 50);
+        }, 800);
       } else {
         applyState(newState);
       }
@@ -149,19 +146,9 @@
 
     function applyState(newState) {
       state = newState;
-      body.className = 'state-' + state;
+      body.className = 'state-' + state + (body.classList.contains('moving-to-back') ? ' moving-to-back' : '');
       cover.classList.toggle('flipped', state >= 1);
       backLeaf.classList.toggle('flipped', state >= 3);
-      
-      // Időzített elrejtés a villanás ellen visszalapozáskor
-      if (state === 0) {
-          setTimeout(() => {
-            if(state === 0) backLeaf.style.visibility = 'hidden';
-          }, 1100);
-      } else {
-          backLeaf.style.visibility = 'visible';
-      }
-
       dots.forEach((dot, idx) => dot.classList.toggle('active', idx === state));
     }
 
@@ -173,9 +160,9 @@
     }
 
     let touchStartX = 0;
-    document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
+    document.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; });
     document.addEventListener('touchend', e => {
-      const touchEndX = e.changedTouches[0].screenX;
+      const touchEndX = e.changedTouches[0].clientX;
       if (touchStartX - touchEndX > 50) move(1);
       if (touchStartX - touchEndX < -50) move(-1);
     });
